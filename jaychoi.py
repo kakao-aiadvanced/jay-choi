@@ -111,20 +111,63 @@ def ask_question(question):
 
 # ask_question(ask)
 
-ask = """
-Solve the following logic puzzle step-by-step:
-Four people (A, B, C, D) are sitting in a row. We know that:
-1. A is not next to B.
-2. B is next to C.
-3. C is not next to D.
+# ask = """
+# Solve the following logic puzzle step-by-step:
+# Four people (A, B, C, D) are sitting in a row. We know that:
+# 1. A is not next to B.
+# 2. B is next to C.
+# 3. C is not next to D.
 
-Determine the possible seating arrangements.
+# Determine the possible seating arrangements.
 
-Step-by-step solution:
-1. Check the first clue.
-2. Check the second clue.
-3. Check the third clue.
-4. Determine the possible seating arrangements.
-"""
+# Step-by-step solution:
+# 1. Check the first clue.
+# 2. Check the second clue.
+# 3. Check the third clue.
+# 4. Determine the possible seating arrangements.
+# """
 
-ask_question(ask)
+# ask_question(ask)
+
+import promptbench as pb
+
+# print('All supported datasets: ')
+# print(pb.SUPPORTED_DATASETS)
+
+# load a dataset, sst2, for instance.
+# if the dataset is not available locally, it will be downloaded automatically.
+dataset_name = "gsm8k"
+dataset = pb.DatasetLoader.load_dataset(dataset_name)
+
+# print the first 3 examples
+dataset[:3]
+
+# print all supported models in promptbench
+# print('All supported models: ')
+# print(pb.SUPPORTED_MODELS)
+
+# load a model, gpt-3.5-turbo, for instance.
+# If model is openai/palm, need to provide openai_key/palm_key
+# If model is llama, vicuna, need to provide model dir
+model = pb.LLMModel(model='gpt-3.5-turbo',
+                    api_key = 'openai_key',
+                    max_new_tokens=150)
+
+# print('All supported methods: ')
+# print(pb.SUPPORTED_METHODS)
+# print('Supported datasets for each method: ')
+# print(pb.METHOD_SUPPORT_DATASET)
+
+# load a method, emotion_prompt, for instance.
+# https://github.com/microsoft/promptbench/tree/main/promptbench/prompt_engineering
+method = pb.PEMethod(method='emotion_prompt',
+                        dataset=dataset_name,
+                        verbose=True,  # if True, print the detailed prompt and response
+                        prompt_id = 1  # for emotion_prompt
+                        )
+
+results = method.test(dataset,
+                      model,
+                      num_samples=3 # if don't set the num_samples, method will use all examples in the dataset
+                      )
+results
