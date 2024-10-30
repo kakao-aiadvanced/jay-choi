@@ -210,47 +210,13 @@ def hallucination_check(state):
         {"documents": documents, "generation": question}
     )
 
-    print(hallucination)
-
-    return state
-
-def grade_documents(state):
-    """
-    Determines whether the retrieved documents are relevant to the question
-    If any document is not relevant, we will set a flag to run web search
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        state (dict): Filtered out irrelevant documents and updated web_search state
-    """
-
-    print("---CHECK DOCUMENT RELEVANCE TO QUESTION---")
-    question = state["question"]
-    documents = state["documents"]
-
-    # Score each doc
-    filtered_docs = []
-    web_search = "No"
-    for d in documents:
-        score = retrieval_grader.invoke(
-            {"question": question, "document": d.page_content}
-        )
-        grade = score["score"]
-        # Document relevant
-        if grade.lower() == "yes":
-            print("---GRADE: DOCUMENT RELEVANT---")
-            filtered_docs.append(d)
-        # Document not relevant
-        else:
-            print("---GRADE: DOCUMENT NOT RELEVANT---")
-            # We do not include the document in filtered_docs
-            # We set a flag to indicate that we want to run web search
-            web_search = "Yes"
-            continue
-    return {"documents": filtered_docs, "question": question, "web_search": web_search}
-
+    score = hallucination["score"]
+    if score.lower() == "yes":
+        print("success: no hallucination")
+        return state
+    else:
+        print("failed: hallucination")
+        exit()
 
 def web_search(state):
     """
@@ -314,49 +280,6 @@ def decide_to_generate_or_websearch(state):
         # We have relevant documents, so generate answer
         print("---DECISION: GENERATE---")
         return "generate"
-
-
-### Conditional edge
-
-
-def grade_generation_v_documents_and_question(state):
-    """
-    Determines whether the generation is grounded in the document and answers question.
-
-    Args:
-        state (dict): The current graph state
-
-    Returns:
-        str: Decision for next node to call
-    """
-
-    print("---CHECK HALLUCINATIONS---")
-    question = state["question"]
-    documents = state["documents"]
-    generation = state["generation"]
-
-    score = hallucination_grader.invoke(
-        {"documents": documents, "generation": generation}
-    )
-    grade = score["score"]
-
-    # Check hallucination
-    if grade == "yes":
-        print("---DECISION: GENERATION IS GROUNDED IN DOCUMENTS---")
-        # Check question-answering
-        print("---GRADE GENERATION vs QUESTION---")
-        score = answer_grader.invoke({"question": question, "generation": generation})
-        grade = score["score"]
-        if grade == "yes":
-            print("---DECISION: GENERATION ADDRESSES QUESTION---")
-            return "useful"
-        else:
-            print("---DECISION: GENERATION DOES NOT ADDRESS QUESTION---")
-            return "not useful"
-    else:
-        pprint("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
-        return "not supported"
-
 
 workflow = StateGraph(GraphState)
 
@@ -426,4 +349,4 @@ outputs = app.stream(inputs)
 for output in outputs:
     for key, value in output.items():
         pprint(f"Finished running: {key}:")
-pprint(value)
+pprint(value["documents"])
