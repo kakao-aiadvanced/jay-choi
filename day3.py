@@ -46,10 +46,10 @@ from langgraph.graph import END, StateGraph
 
 ### Retrieval Grader
 system = """
-    당신은 사용자 질문에 대한 검색된 문서의 관련성을 평가하는 채점자입니다. 
-    문서가 사용자 질문과 관련된 키워드를 포함하고 있다면 관련성이 있다고 평가하세요. 엄격한 테스트일 필요는 없습니다. 목표는 잘못된 검색 결과를 걸러내는 것입니다.
-    문서가 질문과 관련이 있는지 'yes' 또는 'no'로 이진 점수를 주세요.
-    점수를 'relevance' 키 하나만 있는 JSON으로 제공하고, 설명이나 서문은 포함하지 마세요.
+    You are a grader evaluating the relevance of retrieved documents to the user's question.
+    If a document contains keywords related to the user's question, evaluate it as relevant. This doesn't need to be a strict test. The goal is to filter out irrelevant search results.
+    Give a binary score of 'yes' or 'no' for whether the document is relevant to the question.
+    Provide the score in JSON with only a 'relevance' key, without any explanations or preamble.
     """
 
 prompt = ChatPromptTemplate.from_messages(
@@ -64,9 +64,9 @@ retrieval_grader = prompt | llm | JsonOutputParser()
 ### Generate
 
 system = """
-    당신은 질문-답변 작업을 위한 도우미입니다.
-    제공된 검색 컨텍스트를 사용하여 질문에 답하세요. 답을 모르는 경우 모른다고 말하세요.
-    최대 3문장을 사용하고 답변을 간단하게 유지하세요
+    You are an assistant for question-answering tasks.
+    Use the provided search context to answer the question. If you don't know the answer, say so.
+    Keep your response concise using maximum 3 sentences.
     """
 
 prompt = ChatPromptTemplate.from_messages(
@@ -81,9 +81,9 @@ rag_chain = prompt | llm | StrOutputParser()
 
 ### Hallucination Grader
 system = """
-    당신은 답변이 주어진 사실들에 근거하고 있는지/지원되는지 평가하는 채점자입니다. 
-    답변이 사실들에 근거하고 있는지/지원되는지 'yes' 또는 'no'로 이진 점수를 주세요. 
-    점수를 'score' 키 하나만 있는 JSON으로 제공하고, 설명이나 서문은 포함하지 마세요.
+    You are a grader assessing whether the response is based on or supported by the given facts. 
+    Provide a binary score of 'yes' or 'no' indicating whether the response is fact-based or supported. 
+    Deliver the score as a JSON with only the 'score' key, and do not include any explanations or preamble.
     """
 
 prompt = ChatPromptTemplate.from_messages(
@@ -94,30 +94,6 @@ prompt = ChatPromptTemplate.from_messages(
 )
 
 hallucination_grader = prompt | llm | JsonOutputParser()
-
-### Answer Grader
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "{question}"),
-    ]
-)
-
-# Prompt
-system = """
-    당신은 답변이 질문 해결에 유용한지 평가하는 채점자입니다.
-    답변이 질문 해결에 유용한지 'yes' 또는 'no'로 이진 점수를 주세요. 
-    점수를 'score' 키 하나만 있는 JSON으로 제공하고, 설명이나 서문은 포함하지 마세요.
-    """
-
-prompt = ChatPromptTemplate.from_messages(
-    [
-        ("system", system),
-        ("human", "question: {question}\n\n answer: {generation} "),
-    ]
-)
-
-answer_grader = prompt | llm | JsonOutputParser()
 
 class GraphState(TypedDict):
     """
@@ -154,8 +130,6 @@ def retrieve(state):
 
     # Retrieval
     documents = retriever.invoke(question)
-    print(question)
-    print(documents)
     return {"documents": documents, "question": question}
 
 def relevance_check(state):
@@ -211,6 +185,7 @@ def hallucination_check(state):
     )
 
     score = hallucination["score"]
+    print(hallucination)
     if score.lower() == "yes":
         print("success: no hallucination")
         return state
