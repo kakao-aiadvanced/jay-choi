@@ -60,7 +60,6 @@ prompt = ChatPromptTemplate.from_messages(
 )
 
 retrieval_grader = prompt | llm | JsonOutputParser()
-question = "What is prompt?"
 
 ### Generate
 
@@ -192,6 +191,28 @@ def generate(state):
     generation = rag_chain.invoke({"context": documents, "question": question})
     return {"documents": documents, "question": question, "generation": generation}
 
+def hallucination_check(state):
+    """
+    Check if the generation is hallucinated
+
+    Args:
+        state (dict): The current graph state
+
+    Returns:
+        state (dict): return current state
+    """
+    print("---HALLUCINATION CHECK---")
+
+    question = state["question"]
+    documents = state["documents"]
+
+    hallucination = hallucination_grader.invoke(
+        {"documents": documents, "generation": question}
+    )
+
+    print(hallucination)
+
+    return state
 
 def grade_documents(state):
     """
@@ -266,7 +287,7 @@ def web_search(state):
 
 ### Edges
 
-def decide_to_generate(state):
+def decide_to_generate_or_websearch(state):
     """
     Determines whether to generate an answer, or add web search
 
@@ -279,12 +300,12 @@ def decide_to_generate(state):
 
     print("---ASSESS GRADED DOCUMENTS---")
     state["question"]
-    web_search = state["web_search"]
+    relevance = state["relevance"]
+    web_search = relevance['relevance'].lower() == "no"
     state["documents"]
 
-    if web_search == "Yes":
-        # All documents have been filtered check_relevance
-        # We will re-generate a new query
+    # 관계가 없으면 websearch 호출
+    if web_search:
         print(
             "---DECISION: ALL DOCUMENTS ARE NOT RELEVANT TO QUESTION, INCLUDE WEB SEARCH---"
         )
@@ -342,14 +363,24 @@ workflow = StateGraph(GraphState)
 # Define the nodes
 # 1. retrieve
 workflow.add_node("retrieve", retrieve)  # retrieve
-
 workflow.set_entry_point("retrieve")
-
 workflow.add_node("relevance_check", relevance_check)
-
 workflow.add_edge("retrieve", "relevance_check")
+workflow.add_node("websearch", web_search)  # web search
 
-# workflow.add_node("websearch", web_search)  # web search
+# relevance check가 yes인 경우인 경우 websearch 호출
+workflow.add_conditional_edges(
+    "relevance_check",
+    decide_to_generate_or_websearch,
+    {
+        "websearch": "websearch",
+        "generate": "generate",
+    },
+)
+
+workflow.add_node("generate", generate)
+workflow.add_node("hallucination_check", hallucination_check)
+workflow.add_edge("generate", "hallucination_check")
 # workflow.add_node("grade_documents", grade_documents)  # grade documents
 # workflow.add_node("generate", generate)  # generatae
 
@@ -386,8 +417,11 @@ workflow.add_edge("retrieve", "relevance_check")
 app = workflow.compile()
 
 # Test
+# command line에서 query를 입력
+import sys
+query = sys.argv[1]
 
-inputs = {"question": "What is prompt?"}
+inputs = {"question": query}
 outputs = app.stream(inputs)
 for output in outputs:
     for key, value in output.items():
